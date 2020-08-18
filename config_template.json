@@ -1,0 +1,12 @@
+[
+    {
+        "request": {
+            "url": "",
+            "headers": {},
+            "body": {}
+        },
+        "time_loop": 10000,
+        "show": "ALL|ERROR"
+
+    }
+]
