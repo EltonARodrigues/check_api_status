@@ -23,6 +23,7 @@ struct Request {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Config {
+    name: String,
     request: Request,
     time_loop: u64,
     show: String,
@@ -41,22 +42,23 @@ async fn api_config(url: &str) -> Result<StatusCode, Box<dyn std::error::Error>>
     Ok(resp.status())
 }
 
-fn notify(icon_type: &str, message: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn notify(name: &str, icon_type: &str, message: &str) -> Result<(), Box<dyn std::error::Error>> {
     Notification::new()
-        .summary("Status do Broker")
+        .summary(name)
         .body(message)
         .icon(icon_type)
         .show()?;
     Ok(())
 }
 
-fn verify_api(url: &str) {
+fn verify_api(name: &str, url: &str, notify_type: &str) {
     let response = api_config(url);
 
     let f = match response {
         Ok(file) => file,
         Err(_e) => {
             notify(
+                name,
                 "dialog-error",
                 "Parece que deu ruim da uma verificada na api",
             )
@@ -65,9 +67,12 @@ fn verify_api(url: &str) {
         }
     };
     if f == 200 {
-        notify("dialog-information", "Tudo normal segue o jogo!").unwrap();
+        if notify_type != "ERROR" {
+            notify(name, "dialog-information", "Tudo normal segue o jogo!").unwrap();
+        }
     } else {
         notify(
+            name,
             "dialog-error",
             "Parece que deu ruim da uma verificada na api",
         )
@@ -76,12 +81,14 @@ fn verify_api(url: &str) {
 }
 
 fn start_monitor(config: &Config) -> thread::JoinHandle<()> {
+    let name = config.name.clone();
     let url = config.request.url.clone();
     let time_loop = config.time_loop;
+    let notify_type = config.show.clone();
 
     return thread::spawn(move || loop {
         thread::sleep(Duration::from_millis(time_loop));
-        verify_api(&url);
+        verify_api(&name, &url, &notify_type);
     });
 }
 
@@ -102,6 +109,7 @@ fn main() -> std::io::Result<()> {
             }
 
             for handle in threads {
+                thread::sleep(Duration::from_millis(3000));
                 handle.join().unwrap()
             }
         }
