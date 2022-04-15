@@ -18,3 +18,5 @@ Cargo.lock
 .vscode/
 config.json
 # End of https://www.toptal.com/developers/gitignore/api/rust
+.env
+test.txt
