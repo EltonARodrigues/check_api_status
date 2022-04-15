@@ -26,7 +26,9 @@ struct Config {
     name: String,
     request: Request,
     time_loop: u64,
-    show: String,
+    gnome_notify: bool,
+    notify_type: String,
+    show: bool,
 }
 
 fn load_config(data: std::string::String) -> Result<Vec<Config>, Error> {
@@ -56,7 +58,8 @@ fn verify_api(name: &str, url: &str, notify_type: &str) {
 
     let f = match response {
         Ok(file) => file,
-        Err(_e) => {
+        Err(e) => {
+            println!("{0}: OK -> {1}", name, e);   
             notify(
                 name,
                 "dialog-error",
@@ -67,10 +70,12 @@ fn verify_api(name: &str, url: &str, notify_type: &str) {
         }
     };
     if f == 200 {
+        println!("{0}: OK -> {1}", name, f);
         if notify_type != "ERROR" {
             notify(name, "dialog-information", "Tudo normal segue o jogo!").unwrap();
         }
     } else {
+        println!("{0}: ERROR -> {1}", name, f);
         notify(
             name,
             "dialog-error",
@@ -84,26 +89,30 @@ fn start_monitor(config: &Config) -> thread::JoinHandle<()> {
     let name = config.name.clone();
     let url = config.request.url.clone();
     let time_loop = config.time_loop;
-    let notify_type = config.show.clone();
+    let notify_type = config.notify_type.clone();
 
     return thread::spawn(move || loop {
         thread::sleep(Duration::from_millis(time_loop));
+        println!("Verifing {0} ...", name);
         verify_api(&name, &url, &notify_type);
     });
 }
 
 fn main() -> std::io::Result<()> {
+    println!("Start Application");
     let mut file = File::open(CONFIG_FILE)?;
     let mut contents = String::new();
 
     file.read_to_string(&mut contents)?;
 
+    println!("Load config file");
     let resp = load_config(contents);
 
     let mut threads = Vec::new();
     match resp {
         Ok(configs) => {
             for config in configs.iter() {
+                println!("Start thread to monitor endpoint: {0}", config.name);
                 let aa = start_monitor(config);
                 threads.push(aa);
             }
