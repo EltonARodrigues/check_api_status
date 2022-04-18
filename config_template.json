@@ -3,11 +3,14 @@
         "name": "",
         "request": {
             "url": "",
+            "method": "",
             "headers": {},
-            "body": {}
+            "body": null
         },
-        "time_loop": 10000,
+        "expected_status": 200,
+        "time_loop": 5000,
+        "gnome_notify": false,
+        "notify_type": "ERROR",
         "show": "ALL|ERROR"
-
     }
 ]

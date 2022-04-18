@@ -1,3 +1,4 @@
+extern crate job_scheduler;
 extern crate serde;
 extern crate serde_json;
 
@@ -7,6 +8,7 @@ extern crate serde_derive;
 use crate::Value::Null;
 use clap::Arg;
 use clap::Command;
+use job_scheduler::{Job, JobScheduler};
 use notify_rust::Notification;
 use reqwest::header::HeaderMap;
 use reqwest::header::HeaderName;
@@ -16,7 +18,7 @@ use reqwest::{Client, StatusCode, Url};
 use serde_json::Error;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::{fs, thread, time::Duration};
+use std::{fs, time::Duration};
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 enum ConfigMethod {
@@ -40,7 +42,7 @@ struct Config {
     name: String,
     request: Request,
     expected_status: u16,
-    time_loop: u64,
+    cron_expression: String,
     gnome_notify: bool,
     notify_type: String,
     show: bool,
@@ -127,17 +129,31 @@ fn verify_api(name: &str, request: &Request, expected_status: &u16, notify_type:
     }
 }
 
-fn start_monitor(config: Config) -> thread::JoinHandle<()> {
-    return thread::spawn(move || loop {
-        thread::sleep(Duration::from_millis(config.time_loop));
-        println!("Verifing {0} ...", config.name);
-        verify_api(
-            &config.name,
-            &config.request,
-            &config.expected_status,
-            &config.notify_type,
-        );
-    });
+fn start_monitor(configs: Vec<Config>) {
+    let mut sched = JobScheduler::new();
+
+    for config in configs.iter() {
+        println!("Start thread to monitor endpoint: {0}", config.name);
+
+        sched.add(Job::new(
+            config.cron_expression.parse().unwrap(),
+            move || {
+                println!("Verifing {0} ...", config.name);
+                verify_api(
+                    &config.name,
+                    &config.request,
+                    &config.expected_status,
+                    &config.notify_type,
+                );
+            },
+        ));
+    }
+
+    loop {
+        sched.tick();
+
+        std::thread::sleep(Duration::from_millis(500));
+    }
 }
 
 fn load_config(config_path: &str) -> Result<Vec<Config>, Error> {
@@ -172,22 +188,9 @@ fn main() -> std::io::Result<()> {
         .unwrap_or_else(|| panic!("File not set"));
 
     let config_object = load_config(config_path);
-    println!("{:?}", config_object);
-    let mut monitor_threads = Vec::new();
 
     match config_object {
-        Ok(configs) => {
-            for config in configs.iter() {
-                println!("Start thread to monitor endpoint: {0}", config.name);
-                let api_thread = start_monitor(config.clone());
-                monitor_threads.push(api_thread);
-            }
-
-            for handle in monitor_threads {
-                thread::sleep(Duration::from_millis(3000));
-                handle.join().unwrap()
-            }
-        }
+        Ok(configs) => start_monitor(configs.clone()),
         Err(e) => println!("error parsing: {:?}", e),
     }
 
