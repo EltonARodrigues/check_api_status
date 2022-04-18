@@ -8,11 +8,14 @@ use crate::Value::Null;
 use clap::Arg;
 use clap::Command;
 use notify_rust::Notification;
+use reqwest::header::HeaderMap;
+use reqwest::header::HeaderName;
 use reqwest::Method;
 use reqwest::Response;
 use reqwest::{Client, StatusCode, Url};
 use serde_json::Error;
 use serde_json::Value;
+use std::collections::HashMap;
 use std::{fs, thread, time::Duration};
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
@@ -27,7 +30,7 @@ enum ConfigMethod {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 struct Request {
     url: String,
-    headers: Value,
+    headers: HashMap<String, String>,
     method: ConfigMethod,
     body: Value,
 }
@@ -65,15 +68,25 @@ async fn api_config(request: &Request) -> Result<StatusCode, Box<dyn std::error:
 
     // TODO
     let resp: Response;
+
+    let mut headers_map = HeaderMap::new();
+
+    for (key, value) in request.headers.iter() {
+        let header_key = HeaderName::from_lowercase(key.as_bytes()).unwrap();
+        headers_map.insert(header_key, value.to_string().parse().unwrap());
+    }
+
     if request.body != Null {
         resp = client
             .request(Method::from_bytes(method)?, Url::parse(&request.url)?)
+            .headers(headers_map)
             .json(&request.body)
             .send()
             .await?;
     } else {
         resp = client
             .request(Method::from_bytes(method)?, Url::parse(&request.url)?)
+            .headers(headers_map)
             .send()
             .await?;
     };
