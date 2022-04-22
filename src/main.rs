@@ -29,7 +29,7 @@ enum ConfigMethod {
     // PATH,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 struct Request {
     url: String,
     headers: HashMap<String, String>,
@@ -37,9 +37,17 @@ struct Request {
     body: Value,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
+struct Depends {
+    name: String,
+    header_fields: String,
+    request: Request,
+}
+
+#[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 struct Config {
     name: String,
+    depends_on: Value,
     request: Request,
     expected_status: u16,
     cron_expression: String,
@@ -57,8 +65,10 @@ fn notify(name: &str, icon_type: &str, message: &str) -> Result<(), Box<dyn std:
     Ok(())
 }
 
-#[tokio::main]
-async fn api_config(request: &Request) -> Result<StatusCode, Box<dyn std::error::Error>> {
+async fn api_config(
+    request: &Request,
+    headers: HeaderMap,
+) -> Result<reqwest::Response, Box<dyn std::error::Error>> {
     let client = Client::builder().build()?;
 
     // Missing all methods
@@ -71,36 +81,103 @@ async fn api_config(request: &Request) -> Result<StatusCode, Box<dyn std::error:
     // TODO
     let resp: Response;
 
-    let mut headers_map = HeaderMap::new();
-
-    for (key, value) in request.headers.iter() {
-        let header_key = HeaderName::from_lowercase(key.as_bytes()).unwrap();
-        headers_map.insert(header_key, value.to_string().parse().unwrap());
-    }
-
     if request.body != Null {
         resp = client
             .request(Method::from_bytes(method)?, Url::parse(&request.url)?)
-            .headers(headers_map)
+            .headers(headers)
             .json(&request.body)
             .send()
             .await?;
     } else {
         resp = client
             .request(Method::from_bytes(method)?, Url::parse(&request.url)?)
-            .headers(headers_map)
+            .headers(headers)
             .send()
             .await?;
     };
 
-    Ok(resp.status())
+    Ok(resp)
 }
 
-fn verify_api(name: &str, request: &Request, expected_status: &u16, notify_type: &str) {
-    let response = api_config(request);
+fn get_field<'a>(value: &'a Value, fields: Vec<&str>, size: usize, start: usize) -> &'a Value {
+    let next_value = &value[fields[start]];
+
+    if start == (size - 1) {
+        return next_value;
+    }
+
+    return get_field(next_value, fields, size, start + 1);
+}
+
+async fn get_depends_result(depends: &Depends) -> HashMap<String, String> {
+    let mut headers_map = HeaderMap::new();
+
+    for (key, value) in depends.request.headers.iter() {
+        headers_map.insert(
+            HeaderName::from_lowercase(key.as_bytes()).unwrap(),
+            value.parse().unwrap(),
+        );
+    }
+    let response = api_config(&depends.request, headers_map).await;
+   
+    let resp_body = match response {
+        Ok(r) => r.text().await,
+        Err(e) => panic!("TODO"),
+    };
+
+    let result: Value = match resp_body {
+        Ok(r) => {
+            let body_json = serde_json::from_str(&r).unwrap();
+            // let fields: Vec<_> = depends.fields.split('.').collect();
+            // let size =  fields.len();
+            body_json
+        }
+        Err(e) => panic!("TODO: {:?}", e),
+    };
+
+    let fields: Vec<_> = depends.header_fields.split('.').collect();
+    let size = fields.len();
+    let result_field = get_field(&result, fields, size, 0).as_str().unwrap();
+
+    let mut fields_values = HashMap::new();
+    fields_values.insert(depends.header_fields.to_string(), result_field.to_string());
+    fields_values
+}
+
+#[tokio::main]
+async fn verify_api(
+    name: &str,
+    request: &Request,
+    depends_on: &Value,
+    expected_status: &u16,
+    notify_type: &str,
+) {
+    let mut headers_map = HeaderMap::new();
+    let mut field_required = HashMap::new();
+    let depends: Depends = serde_json::from_str(&depends_on.to_string()).unwrap();
+
+    if depends_on != &Null {
+        field_required = get_depends_result(&depends).await;
+
+    }
+
+    for (key, value) in request.headers.iter() {
+        let replace_value = value.replace(
+            &format!("{{{}}}", depends.header_fields),
+            field_required.get(&depends.header_fields).unwrap(),
+        );
+
+        headers_map.insert(
+            HeaderName::from_lowercase(key.as_bytes()).unwrap(),
+            replace_value.parse().unwrap(),
+        );
+    }
+
+    let response = api_config(request, headers_map).await;
+
 
     let status = match response {
-        Ok(status_code) => status_code.as_u16(),
+        Ok(resp) => resp.status().as_u16(),
         Err(e) => {
             println!("{0}: OK -> {1}", name, e);
             notify(
@@ -130,6 +207,7 @@ fn verify_api(name: &str, request: &Request, expected_status: &u16, notify_type:
 }
 
 fn start_monitor(configs: Vec<Config>) {
+    // println!("{:?}", configs);
     let mut sched = JobScheduler::new();
 
     for config in configs.iter() {
@@ -142,6 +220,7 @@ fn start_monitor(configs: Vec<Config>) {
                 verify_api(
                     &config.name,
                     &config.request,
+                    &config.depends_on,
                     &config.expected_status,
                     &config.notify_type,
                 );
