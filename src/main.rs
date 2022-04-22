@@ -18,6 +18,7 @@ use reqwest::{Client, StatusCode, Url};
 use serde_json::Error;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::vec;
 use std::{fs, time::Duration};
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
@@ -40,14 +41,14 @@ struct Request {
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 struct Depends {
     name: String,
-    header_fields: String,
+    header_fields: Vec<String>,
     request: Request,
 }
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 struct Config {
     name: String,
-    depends_on: Value,
+    depends_on: Depends,
     request: Request,
     expected_status: u16,
     cron_expression: String,
@@ -109,7 +110,7 @@ fn get_field<'a>(value: &'a Value, fields: Vec<&str>, size: usize, start: usize)
     return get_field(next_value, fields, size, start + 1);
 }
 
-async fn get_depends_result(depends: &Depends) -> HashMap<String, String> {
+async fn get_depends_result(depends: &Depends) -> Vec<HashMap<String, String>> {
     let mut headers_map = HeaderMap::new();
 
     for (key, value) in depends.request.headers.iter() {
@@ -119,7 +120,7 @@ async fn get_depends_result(depends: &Depends) -> HashMap<String, String> {
         );
     }
     let response = api_config(&depends.request, headers_map).await;
-   
+
     let resp_body = match response {
         Ok(r) => r.text().await,
         Err(e) => panic!("TODO"),
@@ -135,46 +136,57 @@ async fn get_depends_result(depends: &Depends) -> HashMap<String, String> {
         Err(e) => panic!("TODO: {:?}", e),
     };
 
-    let fields: Vec<_> = depends.header_fields.split('.').collect();
-    let size = fields.len();
-    let result_field = get_field(&result, fields, size, 0).as_str().unwrap();
+    let mut depends_result: Vec<HashMap<String, String>> = Vec::new();
 
-    let mut fields_values = HashMap::new();
-    fields_values.insert(depends.header_fields.to_string(), result_field.to_string());
-    fields_values
+    for header_field in &depends.header_fields {
+        let fields: Vec<_> = header_field.split('.').collect();
+        let size = fields.len();
+        let result_field = get_field(&result, fields, size, 0);
+
+        let mut fields_values = HashMap::new();
+        if result_field != &Null {
+            fields_values.insert(header_field.to_string(), result_field.to_string());
+        }
+
+        depends_result.push(fields_values);
+    }
+    depends_result
 }
 
 #[tokio::main]
 async fn verify_api(
     name: &str,
     request: &Request,
-    depends_on: &Value,
+    depends_on: &Depends,
     expected_status: &u16,
     notify_type: &str,
 ) {
     let mut headers_map = HeaderMap::new();
-    let mut field_required = HashMap::new();
-    let depends: Depends = serde_json::from_str(&depends_on.to_string()).unwrap();
-
-    if depends_on != &Null {
-        field_required = get_depends_result(&depends).await;
-
-    }
+    let fields_required = get_depends_result(&depends_on).await;
 
     for (key, value) in request.headers.iter() {
-        let replace_value = value.replace(
-            &format!("{{{}}}", depends.header_fields),
-            field_required.get(&depends.header_fields).unwrap(),
-        );
+        'next_field: for field_required in &fields_required {
+            for (field_name, field_value) in field_required {
+                let field = &format!("{{{}}}", field_name);
 
-        headers_map.insert(
-            HeaderName::from_lowercase(key.as_bytes()).unwrap(),
-            replace_value.parse().unwrap(),
-        );
+                if let Some(_) = value.find(field) {
+                    let replace_value = value.replace(field, &field_value);
+                    headers_map.insert(
+                        HeaderName::from_lowercase(key.as_bytes()).unwrap(),
+                        replace_value.parse().unwrap(),
+                    );
+                    break 'next_field;
+                }
+
+                headers_map.insert(
+                    HeaderName::from_lowercase(key.as_bytes()).unwrap(),
+                    value.parse().unwrap(),
+                );
+            }
+        }
     }
 
     let response = api_config(request, headers_map).await;
-
 
     let status = match response {
         Ok(resp) => resp.status().as_u16(),
