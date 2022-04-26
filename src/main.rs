@@ -14,11 +14,11 @@ use reqwest::header::HeaderMap;
 use reqwest::header::HeaderName;
 use reqwest::Method;
 use reqwest::Response;
-use reqwest::{Client, StatusCode, Url};
+use reqwest::{Client, Url};
+use serde_json::json;
 use serde_json::Error;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::vec;
 use std::{fs, time::Duration};
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
@@ -42,6 +42,7 @@ struct Request {
 struct Depends {
     name: String,
     header_fields: Vec<String>,
+    body_fields: Vec<String>,
     request: Request,
 }
 
@@ -69,6 +70,7 @@ fn notify(name: &str, icon_type: &str, message: &str) -> Result<(), Box<dyn std:
 async fn api_config(
     request: &Request,
     headers: HeaderMap,
+    body: &Value,
 ) -> Result<reqwest::Response, Box<dyn std::error::Error>> {
     let client = Client::builder().build()?;
 
@@ -86,7 +88,7 @@ async fn api_config(
         resp = client
             .request(Method::from_bytes(method)?, Url::parse(&request.url)?)
             .headers(headers)
-            .json(&request.body)
+            .json(&body)
             .send()
             .await?;
     } else {
@@ -110,7 +112,7 @@ fn get_field<'a>(value: &'a Value, fields: Vec<&str>, size: usize, start: usize)
     return get_field(next_value, fields, size, start + 1);
 }
 
-async fn get_depends_result(depends: &Depends) -> Vec<HashMap<String, String>> {
+async fn get_depends_result(depends: &Depends) -> HashMap<String, Vec<HashMap<String, String>>> {
     let mut headers_map = HeaderMap::new();
 
     for (key, value) in depends.request.headers.iter() {
@@ -119,7 +121,7 @@ async fn get_depends_result(depends: &Depends) -> Vec<HashMap<String, String>> {
             value.parse().unwrap(),
         );
     }
-    let response = api_config(&depends.request, headers_map).await;
+    let response = api_config(&depends.request, headers_map, &depends.request.body).await;
 
     let resp_body = match response {
         Ok(r) => r.text().await,
@@ -136,7 +138,7 @@ async fn get_depends_result(depends: &Depends) -> Vec<HashMap<String, String>> {
         Err(e) => panic!("TODO: {:?}", e),
     };
 
-    let mut depends_result: Vec<HashMap<String, String>> = Vec::new();
+    let mut depends_headers: Vec<HashMap<String, String>> = Vec::new();
 
     for header_field in &depends.header_fields {
         let fields: Vec<_> = header_field.split('.').collect();
@@ -148,9 +150,33 @@ async fn get_depends_result(depends: &Depends) -> Vec<HashMap<String, String>> {
             fields_values.insert(header_field.to_string(), result_field.to_string());
         }
 
-        depends_result.push(fields_values);
+        depends_headers.push(fields_values);
     }
-    depends_result
+
+    let mut depends_body: Vec<HashMap<String, String>> = Vec::new();
+
+    for body_field in &depends.body_fields {
+        let fields: Vec<_> = body_field.split('.').collect();
+        let size = fields.len();
+        let result_field = get_field(&result, fields, size, 0);
+
+        let mut fields_values = HashMap::new();
+        if result_field != &Null {
+            // fields_values.insert(body_field.to_string(), result_field.to_string());
+            fields_values.insert(
+                body_field.to_string(),
+                serde_json::to_string(result_field).unwrap(),
+            );
+        }
+
+        depends_body.push(fields_values);
+    }
+
+    let mut depends_results: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
+    depends_results.insert("depends_body".to_string(), depends_body);
+    depends_results.insert("depends_headers".to_string(), depends_headers);
+
+    depends_results
 }
 
 #[tokio::main]
@@ -162,31 +188,52 @@ async fn verify_api(
     notify_type: &str,
 ) {
     let mut headers_map = HeaderMap::new();
+    let mut body = Null;
     let fields_required = get_depends_result(&depends_on).await;
 
     for (key, value) in request.headers.iter() {
-        'next_field: for field_required in &fields_required {
-            for (field_name, field_value) in field_required {
-                let field = &format!("{{{}}}", field_name);
+        for field_required in &fields_required {
+            for (type_name, depends_value) in Some(field_required) {
+                for results in depends_value {
+                    'next_field: for (field_name, field_value) in results {
+                        let field = &format!("{{{}}}", field_name);
+                        if type_name == "depends_headers" {
+                            if let Some(_) = value.find(field) {
+                                let replace_value = value.replace(field, &field_value);
+                                headers_map.insert(
+                                    HeaderName::from_lowercase(key.as_bytes()).unwrap(),
+                                    replace_value.parse().unwrap(),
+                                );
+                                break 'next_field;
+                            } else if headers_map.get(key) == None {
+                                headers_map.insert(
+                                    HeaderName::from_lowercase(key.as_bytes()).unwrap(),
+                                    value.parse().unwrap(),
+                                );
+                            }
+                        } else {
+                            let value_converted: String =
+                                serde_json::from_str(&field_value).unwrap();
+                            for (key, value) in request.body.as_object().unwrap() {
+                                let value_string = value.as_str().unwrap_or_else(|| "");
 
-                if let Some(_) = value.find(field) {
-                    let replace_value = value.replace(field, &field_value);
-                    headers_map.insert(
-                        HeaderName::from_lowercase(key.as_bytes()).unwrap(),
-                        replace_value.parse().unwrap(),
-                    );
-                    break 'next_field;
+                                if let Some(_) = value_string.find(field) {
+                                    let replace_value =
+                                        value_string.replace(field, &value_converted);
+
+                                    body[key] = json!(replace_value);
+                                } else if body.get(key) == None {
+                                    body[key] = value.to_owned();
+                                }
+                            }
+                        }
+                    }
                 }
-
-                headers_map.insert(
-                    HeaderName::from_lowercase(key.as_bytes()).unwrap(),
-                    value.parse().unwrap(),
-                );
             }
         }
     }
 
-    let response = api_config(request, headers_map).await;
+    let response = api_config(request, headers_map, &body).await;
 
     let status = match response {
         Ok(resp) => resp.status().as_u16(),
