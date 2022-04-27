@@ -191,43 +191,43 @@ async fn verify_api(
     let mut body = Null;
     let fields_required = get_depends_result(&depends_on).await;
 
+    println!("{:?}", fields_required);
+
     for (key, value) in request.headers.iter() {
-        for field_required in &fields_required {
-            for (type_name, depends_value) in Some(field_required) {
-                for results in depends_value {
-                    'next_field: for (field_name, field_value) in results {
-                        let field = &format!("{{{}}}", field_name);
-                        if type_name == "depends_headers" {
-                            if let Some(_) = value.find(field) {
-                                let replace_value = value.replace(field, &field_value);
-                                headers_map.insert(
-                                    HeaderName::from_lowercase(key.as_bytes()).unwrap(),
-                                    replace_value.parse().unwrap(),
-                                );
-                                break 'next_field;
-                            } else if headers_map.get(key) == None {
-                                headers_map.insert(
-                                    HeaderName::from_lowercase(key.as_bytes()).unwrap(),
-                                    value.parse().unwrap(),
-                                );
-                            }
-                        } else {
-                            let value_converted: String =
-                                serde_json::from_str(&field_value).unwrap();
-                            for (key, value) in request.body.as_object().unwrap() {
-                                let value_string = value.as_str().unwrap_or_else(|| "");
+        for results in &fields_required["depends_headers"] {
+            for (field_name, field_value) in results {
+                let field = &format!("{{{}}}", field_name);
 
-                                if let Some(_) = value_string.find(field) {
-                                    let replace_value =
-                                        value_string.replace(field, &value_converted);
+                if let Some(_) = value.find(field) {
+                    let replace_value = value.replace(field, &field_value);
+                    headers_map.insert(
+                        HeaderName::from_lowercase(key.as_bytes()).unwrap(),
+                        replace_value.parse().unwrap(),
+                    );
+                } else if headers_map.get(key) == None {
+                    headers_map.insert(
+                        HeaderName::from_lowercase(key.as_bytes()).unwrap(),
+                        value.parse().unwrap(),
+                    );
+                }
+            }
+        }
+    }
 
-                                    body[key] = json!(replace_value);
-                                } else if body.get(key) == None {
-                                    body[key] = value.to_owned();
-                                }
-                            }
-                        }
-                    }
+    for (key, value) in request.body.as_object().unwrap() {
+        for results in &fields_required["depends_body"] {
+            for (field_name, field_value) in results {
+                let field = &format!("{{{}}}", field_name);
+
+                let value_converted: String = serde_json::from_str(&field_value).unwrap();
+                let value_string = value.as_str().unwrap_or_else(|| "");
+
+                if let Some(_) = value_string.find(field) {
+                    let replace_value = value_string.replace(field, &value_converted);
+
+                    body[key] = json!(replace_value);
+                } else if body.get(key) == None {
+                    body[key] = value.to_owned();
                 }
             }
         }
