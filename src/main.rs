@@ -19,6 +19,7 @@ use serde_json::json;
 use serde_json::Error;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::{fs, time::Duration};
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
@@ -49,7 +50,7 @@ struct Depends {
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 struct Config {
     name: String,
-    depends_on: Depends,
+    depends_on: Option<Depends>,
     request: Request,
     expected_status: u16,
     cron_expression: String,
@@ -125,7 +126,7 @@ async fn get_depends_result(depends: &Depends) -> HashMap<String, Vec<HashMap<St
 
     let resp_body = match response {
         Ok(r) => r.text().await,
-        Err(e) => panic!("TODO"),
+        Err(err) => panic!("Error to request Api: {:?}", err),
     };
 
     let result: Value = match resp_body {
@@ -183,54 +184,66 @@ async fn get_depends_result(depends: &Depends) -> HashMap<String, Vec<HashMap<St
 async fn verify_api(
     name: &str,
     request: &Request,
-    depends_on: &Depends,
+    depends_on: &Option<Depends>,
     expected_status: &u16,
     notify_type: &str,
 ) {
     let mut headers_map = HeaderMap::new();
     let mut body = Null;
-    let fields_required = get_depends_result(&depends_on).await;
 
-    println!("{:?}", fields_required);
+    let fields_required = match depends_on {
+        Some(depends) => get_depends_result(&depends).await,
+        None => HashMap::new(),
+    };
+    // let fields_required = get_depends_result(&depends_on).await;
+
+    // println!("{:?}", fields_required);
 
     for (key, value) in request.headers.iter() {
-        for results in &fields_required["depends_headers"] {
-            for (field_name, field_value) in results {
-                let field = &format!("{{{}}}", field_name);
+        println!("gdfgfdg>>{:?}", fields_required.len());
+        if fields_required.len() > 0 {
+            for results in &fields_required["depends_headers"] {
+                for (field_name, field_value) in results {
+                    let field = &format!("{{{}}}", field_name);
 
-                if let Some(_) = value.find(field) {
-                    let replace_value = value.replace(field, &field_value);
-                    headers_map.insert(
-                        HeaderName::from_lowercase(key.as_bytes()).unwrap(),
-                        replace_value.parse().unwrap(),
-                    );
-                } else if headers_map.get(key) == None {
-                    headers_map.insert(
-                        HeaderName::from_lowercase(key.as_bytes()).unwrap(),
-                        value.parse().unwrap(),
-                    );
+                    if let Some(_) = value.find(field) {
+                        let replace_value = value.replace(field, &field_value);
+                        headers_map.insert(
+                            HeaderName::from_str(key).unwrap(),
+                            replace_value.parse().unwrap(),
+                        );
+                    } else if headers_map.get(key) == None {
+                        headers_map
+                            .insert(HeaderName::from_str(key).unwrap(), value.parse().unwrap());
+                    }
                 }
             }
+        } else {
+            headers_map.insert(HeaderName::from_str(key).unwrap(), value.parse().unwrap());
         }
     }
 
-    for (key, value) in request.body.as_object().unwrap() {
-        for results in &fields_required["depends_body"] {
-            for (field_name, field_value) in results {
-                let field = &format!("{{{}}}", field_name);
+    if fields_required.len() > 0 {
+        for (key, value) in request.body.as_object().unwrap() {
+            for results in &fields_required["depends_body"] {
+                for (field_name, field_value) in results {
+                    let field = &format!("{{{}}}", field_name);
 
-                let value_converted: String = serde_json::from_str(&field_value).unwrap();
-                let value_string = value.as_str().unwrap_or_else(|| "");
+                    let value_converted: String = serde_json::from_str(&field_value).unwrap();
+                    let value_string = value.as_str().unwrap_or_else(|| "");
 
-                if let Some(_) = value_string.find(field) {
-                    let replace_value = value_string.replace(field, &value_converted);
+                    if let Some(_) = value_string.find(field) {
+                        let replace_value = value_string.replace(field, &value_converted);
 
-                    body[key] = json!(replace_value);
-                } else if body.get(key) == None {
-                    body[key] = value.to_owned();
+                        body[key] = json!(replace_value);
+                    } else if body.get(key) == None {
+                        body[key] = value.to_owned();
+                    }
                 }
             }
         }
+    } else {
+        body = request.body.to_owned()
     }
 
     let response = api_config(request, headers_map, &body).await;
