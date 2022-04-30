@@ -1,0 +1,51 @@
+requests:
+  api1:
+    name:
+    depends_on:
+      name:
+      header_fields:
+        - xxxx.xxxxxxxx
+        - xxxxxxxxx.xx
+      body_fields:
+        - xxxx.xxxxx.xxxxx
+        - xx.xxx
+      request:
+        url: http://127.0.0.1:5000/auth/token
+        method: GET
+        headers:
+          sample1: XXXXXXXXX,
+          sample2: XXXXXXXXX
+        body:
+          sample1: XXXXXXXXX,
+          sample2: XXXXXXXXX
+    request:
+      url: http://127.0.0.1:5000/message/555555555
+      method: POST
+      headers:
+        sample1: "TEST {{xxxx.xxxxxxxx}}"
+        sample2: "{{xxxxxxxxx.xx}}"
+        sample3: "Sample"
+
+      body:
+        sample1: "TEST {{xxxx.xxxxx.xxxxx}}"
+        sample2: "{{xx.xxx}}"
+        sample3: "Sample Body"
+    expected_status: 201
+    cron_expression: "0/10 * * * * *"
+    gnome_notify: false
+    notify_type: ALL|ERROR
+  api2:
+    name:
+    request:
+      url:
+      method: POST
+      headers:
+        sample1: "sample1"
+        sample2: "sample2"
+      body:
+        sample1: "sample1"
+        sample2: "sample2"
+    expected_status: 200
+    cron_expression: "0/10 * * * * *"
+    gnome_notify: false
+    notify_type: ALL|ERROR
