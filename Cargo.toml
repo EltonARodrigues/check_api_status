@@ -1,5 +1,5 @@
 [package]
-name = "api-status"
+name = "api_status"
 version = "0.1.0"
 authors = ["Elton de Andrade Rodrigues <eltonrodrigues61@gmail.com>"]
 edition = "2018"
@@ -16,7 +16,6 @@ serde = "1.0"
 lettre = "0.10.0-rc.5"
 dotenv = "0.15.0"
 clap = "3.1.8"
-chrono = "0.4.19"
 job_scheduler = "*"
 yaml-rust = "0.4"
 serde_yaml = "0.8.23"
