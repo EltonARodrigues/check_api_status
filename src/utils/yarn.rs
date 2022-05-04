@@ -36,7 +36,7 @@ pub struct Api {
     pub request: Request,
     pub expected_status: u16,
     pub cron_expression: String,
-    pub gnome_notify: bool,
+    pub system_notify: bool,
     pub notify_type: String,
 }
 

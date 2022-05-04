@@ -1,5 +1,5 @@
-mod utils;
 mod request;
+mod utils;
 
 use request::{get_depends_result, request_api};
 
@@ -15,7 +15,6 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::{fs, time::Duration};
-
 
 #[tokio::main]
 async fn verify_api(api: &Api) {
@@ -90,12 +89,14 @@ async fn verify_api(api: &Api) {
         Ok(resp) => resp.status().as_u16(),
         Err(e) => {
             println!("{0}: OK -> {1}", api.name, e);
-            send_notify(
-                api.name.as_str(),
-                "dialog-error",
-                "Parece que deu ruim da uma verificada na api",
-            )
-            .unwrap();
+            if api.system_notify == true {
+                send_notify(
+                    api.name.as_str(),
+                    "dialog-error",
+                    "Parece que deu ruim da uma verificada na api",
+                )
+                .unwrap();
+            }
             return ();
         }
     };
@@ -103,7 +104,7 @@ async fn verify_api(api: &Api) {
     println!("received {0}: spected {1}", status, api.expected_status);
     if status == api.expected_status {
         println!("{0}: OK -> {1}", api.name, status);
-        if api.notify_type != "ERROR" {
+        if api.notify_type != "ERROR" && api.system_notify == true {
             send_notify(
                 api.name.as_str(),
                 "dialog-information",
@@ -113,12 +114,14 @@ async fn verify_api(api: &Api) {
         }
     } else {
         println!("{0}: ERROR -> {1}", api.name, status);
-        send_notify(
-            api.name.as_str(),
-            "dialog-error",
-            "Parece que deu ruim da uma verificada na api",
-        )
-        .unwrap();
+        if api.system_notify == true {
+            send_notify(
+                api.name.as_str(),
+                "dialog-error",
+                "Parece que deu ruim da uma verificada na api",
+            )
+            .unwrap();
+        }
     }
 }
 

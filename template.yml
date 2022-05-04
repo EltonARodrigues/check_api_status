@@ -32,7 +32,7 @@ requests:
         sample3: "Sample Body"
     expected_status: 201
     cron_expression: "0/10 * * * * *"
-    gnome_notify: false
+    system_notify: false
     notify_type: ALL|ERROR
   api2:
     name:
@@ -47,5 +47,5 @@ requests:
         sample2: "sample2"
     expected_status: 200
     cron_expression: "0/10 * * * * *"
-    gnome_notify: false
+    system_notify: false
     notify_type: ALL|ERROR
