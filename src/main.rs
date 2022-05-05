@@ -23,7 +23,7 @@ async fn verify_api(api: &Api) {
     println!("{:?}", api.depends_on);
 
     let fields_required = match &api.depends_on {
-        Some(depends) => get_depends_result(&depends).await,
+        Some(depends) => get_depends_result(&depends, api.system_notify).await,
         None => HashMap::new(),
     };
 
