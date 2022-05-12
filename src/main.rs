@@ -165,7 +165,7 @@ fn main() -> std::io::Result<()> {
     let matches = Command::new("My Test Program")
         .version("0.1.0")
         .author("Elton de Andrade Rodrigues <xxxxxxxxxxxx@xx>")
-        .about("Teaches argument parsing")
+        .about("Verify API status")
         .arg(
             Arg::new("file")
                 .short('f')
