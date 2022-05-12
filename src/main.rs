@@ -20,14 +20,14 @@ use std::{fs, time::Duration};
 async fn verify_api(api: &Api) {
     let mut headers_map = HeaderMap::new();
 
-    println!("{:?}", api.depends_on);
+    // println!("{:?}", api.depends_on);
 
     let fields_required = match &api.depends_on {
         Some(depends) => get_depends_result(&depends, api.system_notify).await,
         None => HashMap::new(),
     };
 
-    println!("headers main: {:?}", api.request.headers);
+    // println!("headers main: {:?}", api.request.headers);
 
     for header in &api.request.headers {
         for (key, value) in header {
@@ -93,7 +93,7 @@ async fn verify_api(api: &Api) {
                 send_notify(
                     api.name.as_str(),
                     "dialog-error",
-                    "Parece que deu ruim da uma verificada na api",
+                    "Request failed",
                 )
                 .unwrap();
             }
@@ -105,20 +105,22 @@ async fn verify_api(api: &Api) {
     if status == api.expected_status {
         println!("{0}: OK -> {1}", api.name, status);
         if api.notify_type != "ERROR" && api.system_notify == true {
+            let msg = format!("Expected: {} Received: {} - Everything is OK", status, api.expected_status);
             send_notify(
                 api.name.as_str(),
                 "dialog-information",
-                "Tudo normal segue o jogo!",
+                &msg,
             )
             .unwrap();
         }
     } else {
         println!("{0}: ERROR -> {1}", api.name, status);
         if api.system_notify == true {
+            let msg = format!("Expected: {} Received: {} - ERROR", status, api.expected_status);
             send_notify(
                 api.name.as_str(),
                 "dialog-error",
-                "Parece que deu ruim da uma verificada na api",
+                &msg,
             )
             .unwrap();
         }

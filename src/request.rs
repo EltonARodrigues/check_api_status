@@ -124,10 +124,12 @@ pub async fn get_depends_result(depends: &Depends, system_notify: bool) -> HashM
         }
         Err(_) => {
             if system_notify == true {
+                let msg = format!("Error to request depends");
+
                 send_notify(
                     depends.name.as_str(),
                     "dialog-error",
-                    "Parece que deu ruim na api depends da uma verificada na api",
+                    &msg,
                 )
                 .unwrap();
             }
