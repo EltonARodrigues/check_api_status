@@ -55,6 +55,7 @@ impl Config {
 }
 
 pub fn send_email(message: String) -> Result<(), String> {
+    println!("sendind Email status");
     let config: Config = Config::new().unwrap();
     println!("{:?}", config);
     if config.missing_config {
