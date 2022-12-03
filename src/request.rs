@@ -1,10 +1,9 @@
-
 use reqwest::{header::HeaderMap, header::HeaderName, Client, Method, Response, Url};
 use serde_json::Value;
 use std::collections::HashMap;
 
-use crate::utils::yarn::{ConfigMethod, Depends, ReqHash, Request};
 use crate::utils::notify::send_notify;
+use crate::utils::yarn::{ConfigMethod, Depends, ReqHash, Request};
 
 use crate::Value::Null;
 
@@ -58,7 +57,10 @@ fn get_field<'a>(value: &'a Value, fields: Vec<&str>, size: usize, start: usize)
     return get_field(next_value, fields, size, start + 1);
 }
 
-pub async fn get_depends_result(depends: &Depends, system_notify: bool) -> HashMap<String, Vec<ReqHash>> {
+pub async fn get_depends_result(
+    depends: &Depends,
+    system_notify: bool,
+) -> HashMap<String, Vec<ReqHash>> {
     let mut headers_map = HeaderMap::new();
 
     for header in &depends.request.headers {
@@ -126,12 +128,7 @@ pub async fn get_depends_result(depends: &Depends, system_notify: bool) -> HashM
             if system_notify == true {
                 let msg = format!("Error to request depends");
 
-                send_notify(
-                    depends.name.as_str(),
-                    "dialog-error",
-                    &msg,
-                )
-                .unwrap();
+                send_notify(depends.name.as_str(), "dialog-error", &msg).unwrap();
             }
             HashMap::new()
         }

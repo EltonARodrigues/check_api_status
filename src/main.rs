@@ -90,12 +90,7 @@ async fn verify_api(api: &Api) {
         Err(e) => {
             println!("{0}: OK -> {1}", api.name, e);
             if api.system_notify == true {
-                send_notify(
-                    api.name.as_str(),
-                    "dialog-error",
-                    "Request failed",
-                )
-                .unwrap();
+                send_notify(api.name.as_str(), "dialog-error", "Request failed").unwrap();
             }
             return ();
         }
@@ -105,24 +100,20 @@ async fn verify_api(api: &Api) {
     if status == api.expected_status {
         println!("{0}: OK -> {1}", api.name, status);
         if api.notify_type != "ERROR" && api.system_notify == true {
-            let msg = format!("Expected: {} Received: {} - Everything is OK", status, api.expected_status);
-            send_notify(
-                api.name.as_str(),
-                "dialog-information",
-                &msg,
-            )
-            .unwrap();
+            let msg = format!(
+                "Expected: {} Received: {} - Everything is OK",
+                status, api.expected_status
+            );
+            send_notify(api.name.as_str(), "dialog-information", &msg).unwrap();
         }
     } else {
         println!("{0}: ERROR -> {1}", api.name, status);
         if api.system_notify == true {
-            let msg = format!("Expected: {} Received: {} - ERROR", status, api.expected_status);
-            send_notify(
-                api.name.as_str(),
-                "dialog-error",
-                &msg,
-            )
-            .unwrap();
+            let msg = format!(
+                "Expected: {} Received: {} - ERROR",
+                status, api.expected_status
+            );
+            send_notify(api.name.as_str(), "dialog-error", &msg).unwrap();
         }
     }
 }
