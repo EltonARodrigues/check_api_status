@@ -14,7 +14,25 @@ use reqwest::header::HeaderName;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::{error::Error, io};
 use std::{fs, time::Duration};
+
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use ratatui::{
+    backend::{Backend, CrosstermBackend},
+    Terminal,
+};
+
+mod app;
+mod ui;
+use crate::{
+    app::{App, CurrentScreen, CurrentlyEditing},
+    ui::ui,
+};
 
 #[tokio::main]
 async fn verify_api(api: &Api) {
@@ -152,9 +170,50 @@ fn load_config(config_path: &str) -> Result<ApisConfig, serde_yaml::Error> {
     deserialized
 }
 
-fn main() -> std::io::Result<()> {
-    println!("Start Application");
+// fn main() -> std::io::Result<()> {
+//     println!("Start Application");
 
+//     let matches = Command::new("My Test Program")
+//         .version("0.1.0")
+//         .author("Elton de Andrade Rodrigues <xxxxxxxxxxxx@xx>")
+//         .about("Verify API status")
+//         .arg(
+//             Arg::new("file")
+//                 .short('f')
+//                 .long("file")
+//                 .takes_value(true)
+//                 .help("config file with APIs"),
+//         )
+//         .get_matches();
+
+//     let config_path = matches
+//         .value_of("file")
+//         .unwrap_or_else(|| panic!("File not set"));
+
+//     let config_object = load_config(config_path);
+
+//     match config_object {
+//         Ok(configs) => start_monitor(&configs.requests),
+//         Err(e) => println!("error parsing: {:?}", e),
+//     }
+
+//     Ok(())
+// }
+
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<bool> {
+    loop {
+        terminal.draw(|f| ui(f, app))?;
+
+        if let Event::Key(key) = event::read()? {
+            if key.kind == event::KeyEventKind::Release {
+                // Skip events that are not KeyEventKind::Press
+                continue;
+            }
+        }
+    }
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
     let matches = Command::new("My Test Program")
         .version("0.1.0")
         .author("Elton de Andrade Rodrigues <xxxxxxxxxxxx@xx>")
@@ -174,10 +233,32 @@ fn main() -> std::io::Result<()> {
 
     let config_object = load_config(config_path);
 
+    // setup terminal
+    enable_raw_mode()?;
+    let mut stderr: io::Stderr = io::stderr(); // This is a special case. Normally using stdout is fine
+    execute!(stderr, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stderr);
+    let mut terminal = Terminal::new(backend)?;
+
+    // create app and run it
     match config_object {
-        Ok(configs) => start_monitor(&configs.requests),
+        Ok(configs) => {
+            // start_monitor(&configs.requests),
+            let mut app = App::new(&configs.requests);
+            let res = run_app(&mut terminal, &mut app);
+        
+            // restore terminal
+            disable_raw_mode()?;
+            execute!(
+                terminal.backend_mut(),
+                LeaveAlternateScreen,
+                DisableMouseCapture
+            )?;
+            terminal.show_cursor()?;
+        
+            Ok(())
+            
+        }
         Err(e) => println!("error parsing: {:?}", e),
     }
-
-    Ok(())
 }
