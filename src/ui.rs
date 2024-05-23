@@ -12,6 +12,33 @@ use ratatui::{
 
 use crate::app::App;
 
+use tracing::{error, trace};
+use tracing_error::ErrorLayer;
+use tracing_subscriber::{self, layer::SubscriberExt, util::SubscriberInitExt, Layer};
+
+
+#[macro_export]
+macro_rules! trace_dbg {
+    (target: $target:expr, level: $level:expr, $ex:expr) => {{
+        match $ex {
+            value => {
+                tracing::event!(target: $target, $level, ?value, stringify!($ex));
+                value
+            }
+        }
+    }};
+    (level: $level:expr, $ex:expr) => {
+        trace_dbg!(target: module_path!(), level: $level, $ex)
+    };
+    (target: $target:expr, $ex:expr) => {
+        trace_dbg!(target: $target, level: tracing::Level::DEBUG, $ex)
+    };
+    ($ex:expr) => {
+        trace_dbg!(level: tracing::Level::DEBUG, $ex)
+    };
+}
+
+
 pub fn ui(f: &mut Frame, app: &App) {
     let title: Title<'static> = Title::from(" Health Crab TUI ".bold());
 
@@ -73,34 +100,57 @@ pub fn ui(f: &mut Frame, app: &App) {
 
     f.render_widget(header_info, chunks[1]);
 
-    let mut rows = Vec::<[Cell; 4]>::new();
+    // for api_info in app.apis_infos {
+    //     rows.push([
+    //         Cell::from(Text::from(String::from(api_info.get("name").unwrap())).alignment(Alignment::Center)),
+    //         Cell::from(Text::from(String::from(api_info.get("url").unwrap())).alignment(Alignment::Center)),
+    //         Cell::from(Text::from(String::from(api_info.get("url").unwrap())).alignment(Alignment::Center)),
+    //         Cell::from(Text::from(String::from(api_info.get("status").unwrap())).alignment(Alignment::Center))
+    //             .style(Style::default().fg(Color::Green)),
+    //     ]);
+    // }
 
-    for key in app.configs.keys() {
-        rows.push([
-            Cell::from(Text::from("Buscar usuários").alignment(Alignment::Center)),
-            Cell::from(Text::from("GET").alignment(Alignment::Center)),
-            Cell::from(Text::from("http://test.com.test").alignment(Alignment::Center)),
-            Cell::from(Text::from("OK").alignment(Alignment::Center))
-                .style(Style::default().fg(Color::Green)),
-        ]);
+    let mut rows: Vec<Row> = Vec::new();
+
+    for api_info in &app.apis_infos {
+        rows.push(Row::new(vec![
+            Cell::from(
+                Text::from(String::from(api_info.get("name").unwrap()))
+                    .alignment(Alignment::Center),
+            ),
+            Cell::from(
+                Text::from(String::from(api_info.get("method").unwrap())).alignment(Alignment::Center),
+            ),
+            Cell::from(
+                Text::from(String::from(api_info.get("url").unwrap())).alignment(Alignment::Center),
+            ),
+            Cell::from(
+                Text::from(String::from(api_info.get("status").unwrap()))
+                    .alignment(Alignment::Center),
+            )
+            .style(Style::default().fg(Color::Green)),
+
+        ]))
+        // rows.push([
+        // ]);
     }
 
-    let rows = [
-        Row::new(vec![
-            Cell::from(Text::from("Buscar usuários").alignment(Alignment::Center)),
-            Cell::from(Text::from("GET").alignment(Alignment::Center)),
-            Cell::from(Text::from("http://test.com.test").alignment(Alignment::Center)),
-            Cell::from(Text::from("OK").alignment(Alignment::Center))
-                .style(Style::default().fg(Color::Green)),
-        ]),
-        Row::new(vec![
-            Cell::from(Text::from("Buscar lances").alignment(Alignment::Center)),
-            Cell::from(Text::from("POST").alignment(Alignment::Center)),
-            Cell::from(Text::from("http://test.com.test22").alignment(Alignment::Center)),
-            Cell::from(Text::from("FAILED").alignment(Alignment::Center))
-                .style(Style::default().fg(Color::Red)),
-        ]),
-    ];
+    // let rows = [
+    //     Row::new(vec![
+    //         Cell::from(Text::from("Buscar usuários").alignment(Alignment::Center)),
+    //         Cell::from(Text::from("GET").alignment(Alignment::Center)),
+    //         Cell::from(Text::from("http://test.com.test").alignment(Alignment::Center)),
+    //         Cell::from(Text::from("OK").alignment(Alignment::Center))
+    //             .style(Style::default().fg(Color::Green)),
+    //     ]),
+    //     Row::new(vec![
+    //         Cell::from(Text::from("Buscar lances").alignment(Alignment::Center)),
+    //         Cell::from(Text::from("POST").alignment(Alignment::Center)),
+    //         Cell::from(Text::from("http://test.com.test22").alignment(Alignment::Center)),
+    //         Cell::from(Text::from("FAILED").alignment(Alignment::Center))
+    //             .style(Style::default().fg(Color::Red)),
+    //     ]),
+    // ];
     // Columns widths are constrained in the same way as Layout...
     let widths = [
         Constraint::Length(20),
@@ -124,7 +174,6 @@ pub fn ui(f: &mut Frame, app: &App) {
         .highlight_symbol(">>");
 
     f.render_widget(table, content_center);
-
 }
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`

@@ -1,6 +1,6 @@
 requests:
   api1:
-    name:
+    name: teste_api
     depends_on:
       name:
       header_fields:
@@ -35,9 +35,9 @@ requests:
     system_notify: false
     notify_type: ALL|ERROR
   api2:
-    name:
+    name: api nova 123
     request:
-      url:
+      url: http://127.0.0.1:5000/aaa
       method: POST
       headers:
         sample1: "sample1"

@@ -13,6 +13,15 @@ pub enum ConfigMethod {
     // PATH,
 }
 
+impl ToString for ConfigMethod {
+    fn to_string(&self) -> String {
+        match self {
+            ConfigMethod::GET => String::from("GET"),
+            ConfigMethod::POST => String::from("POST"),
+        }
+    }
+}
+
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct Request {
     pub url: String,

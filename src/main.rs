@@ -136,28 +136,28 @@ async fn verify_api(api: &Api) {
     }
 }
 
-fn start_monitor(configs: &HashMap<String, Api>) {
-    // println!("{:?}", configs);
-    let mut sched = JobScheduler::new();
+// fn start_monitor(configs: &HashMap<String, Api>) {
+//     // println!("{:?}", configs);
+//     let mut sched = JobScheduler::new();
 
-    for config in configs {
-        println!("Start thread to monitor endpoint: {:?}", config.0);
+//     for config in configs {
+//         println!("Start thread to monitor endpoint: {:?}", config.0);
 
-        sched.add(Job::new(
-            config.1.cron_expression.parse().unwrap(),
-            move || {
-                println!("Verifing {0} ...", config.0);
-                verify_api(&config.1);
-            },
-        ));
-    }
+//         sched.add(Job::new(
+//             config.1.cron_expression.parse().unwrap(),
+//             move || {
+//                 println!("Verifing {0} ...", config.0);
+//                 verify_api(&config.1);
+//             },
+//         ));
+//     }
 
-    loop {
-        sched.tick();
+//     loop {
+//         sched.tick();
 
-        std::thread::sleep(Duration::from_millis(500));
-    }
-}
+//         std::thread::sleep(Duration::from_millis(500));
+//     }
+// }
 
 fn load_config(config_path: &str) -> Result<ApisConfig, serde_yaml::Error> {
     println!("Searching for {}", config_path);
@@ -209,11 +209,18 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                 // Skip events that are not KeyEventKind::Press
                 continue;
             }
+            match key.code {
+                KeyCode::Char('n') | KeyCode::Char('q') => {
+                    return Ok(false);
+                }
+                _ => {}
+            }
         }
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     let matches = Command::new("My Test Program")
         .version("0.1.0")
         .author("Elton de Andrade Rodrigues <xxxxxxxxxxxx@xx>")
@@ -244,8 +251,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     match config_object {
         Ok(configs) => {
             // start_monitor(&configs.requests),
-            let mut app = App::new(&configs.requests);
+            let mut app = App::new(&configs);
+            app.format_api_infos();
             let res = run_app(&mut terminal, &mut app);
+        
         
             // restore terminal
             disable_raw_mode()?;
@@ -255,10 +264,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 DisableMouseCapture
             )?;
             terminal.show_cursor()?;
-        
-            Ok(())
-            
+            // Ok(())
+    
         }
         Err(e) => println!("error parsing: {:?}", e),
     }
+
+    Ok(())
 }
