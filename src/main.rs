@@ -1,24 +1,29 @@
 mod request;
 mod utils;
 
+use app::{ApiInformation, ListRequests};
 use request::{get_depends_result, request_api};
 
-use utils::notify::send_notify;
 use utils::yarn::{Api, ApisConfig, ReqHash};
 
 use clap::Arg;
 use clap::Command;
-use job_scheduler::{Job, JobScheduler};
+use futures::executor::block_on;
 use reqwest::header::HeaderMap;
 use reqwest::header::HeaderName;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::convert::TryInto;
+use std::fs;
 use std::str::FromStr;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 use std::{error::Error, io};
-use std::{fs, time::Duration};
+use tokio::task;
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+    event::{self, DisableMouseCapture, EnableMouseCapture, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -29,24 +34,17 @@ use ratatui::{
 
 mod app;
 mod ui;
-use crate::{
-    app::{App, CurrentScreen, CurrentlyEditing},
-    ui::ui,
-};
+use crate::{app::App, ui::ui};
 
-#[tokio::main]
-async fn verify_api(api: &Api) {
+async fn verify_api(api: &Api) -> ApiInformation {
     let mut headers_map = HeaderMap::new();
 
-    // println!("{:?}", api.depends_on);
-
     let fields_required = match &api.depends_on {
-        Some(depends) => get_depends_result(&depends, api.system_notify).await,
+        Some(depends) => block_on(get_depends_result(&depends, api.system_notify)),
         None => HashMap::new(),
     };
 
-    // println!("headers main: {:?}", api.request.headers);
-
+    // println!("aaa{:?}", fields_required["depends_headers"]);
     for header in &api.request.headers {
         for (key, value) in header {
             if fields_required.len() > 0 {
@@ -105,59 +103,28 @@ async fn verify_api(api: &Api) {
 
     let status = match response {
         Ok(resp) => resp.status().as_u16(),
-        Err(e) => {
-            println!("{0}: OK -> {1}", api.name, e);
-            if api.system_notify == true {
-                send_notify(api.name.as_str(), "dialog-error", "Request failed").unwrap();
-            }
-            return ();
+        Err(_) => {
+            500 // TODO
         }
     };
 
-    println!("received {0}: spected {1}", status, api.expected_status);
+    let mut request_data = ApiInformation {
+        name: api.name.to_string(),
+        url: api.request.url.to_string(),
+        method: api.request.method.to_string(),
+        status: "WAINTING".to_string(),
+    };
+
     if status == api.expected_status {
-        println!("{0}: OK -> {1}", api.name, status);
-        if api.notify_type != "ERROR" && api.system_notify == true {
-            let msg = format!(
-                "Expected: {} Received: {} - Everything is OK",
-                status, api.expected_status
-            );
-            send_notify(api.name.as_str(), "dialog-information", &msg).unwrap();
+        if api.notify_type != "ERROR" {
+            request_data.status = "OK".to_string();
         }
     } else {
-        println!("{0}: ERROR -> {1}", api.name, status);
-        if api.system_notify == true {
-            let msg = format!(
-                "Expected: {} Received: {} - ERROR",
-                status, api.expected_status
-            );
-            send_notify(api.name.as_str(), "dialog-error", &msg).unwrap();
-        }
+        request_data.status = "ERROR".to_string();
     }
+
+    request_data
 }
-
-// fn start_monitor(configs: &HashMap<String, Api>) {
-//     // println!("{:?}", configs);
-//     let mut sched = JobScheduler::new();
-
-//     for config in configs {
-//         println!("Start thread to monitor endpoint: {:?}", config.0);
-
-//         sched.add(Job::new(
-//             config.1.cron_expression.parse().unwrap(),
-//             move || {
-//                 println!("Verifing {0} ...", config.0);
-//                 verify_api(&config.1);
-//             },
-//         ));
-//     }
-
-//     loop {
-//         sched.tick();
-
-//         std::thread::sleep(Duration::from_millis(500));
-//     }
-// }
 
 fn load_config(config_path: &str) -> Result<ApisConfig, serde_yaml::Error> {
     println!("Searching for {}", config_path);
@@ -170,50 +137,79 @@ fn load_config(config_path: &str) -> Result<ApisConfig, serde_yaml::Error> {
     deserialized
 }
 
-// fn main() -> std::io::Result<()> {
-//     println!("Start Application");
+async fn run_app<B: Backend>(
+    terminal: &mut Terminal<B>,
+    app: &mut App,
+    configs: &HashMap<String, Api>,
+) -> io::Result<bool> {
+    let mut handles: HashMap<usize, task::JoinHandle<()>> = HashMap::new();
 
-//     let matches = Command::new("My Test Program")
-//         .version("0.1.0")
-//         .author("Elton de Andrade Rodrigues <xxxxxxxxxxxx@xx>")
-//         .about("Verify API status")
-//         .arg(
-//             Arg::new("file")
-//                 .short('f')
-//                 .long("file")
-//                 .takes_value(true)
-//                 .help("config file with APIs"),
-//         )
-//         .get_matches();
+    let results = Arc::new(Mutex::new(app.apis_infos.clone()));
 
-//     let config_path = matches
-//         .value_of("file")
-//         .unwrap_or_else(|| panic!("File not set"));
-
-//     let config_object = load_config(config_path);
-
-//     match config_object {
-//         Ok(configs) => start_monitor(&configs.requests),
-//         Err(e) => println!("error parsing: {:?}", e),
-//     }
-
-//     Ok(())
-// }
-
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<bool> {
     loop {
         terminal.draw(|f| ui(f, app))?;
 
-        if let Event::Key(key) = event::read()? {
-            if key.kind == event::KeyEventKind::Release {
-                // Skip events that are not KeyEventKind::Press
-                continue;
-            }
-            match key.code {
-                KeyCode::Char('n') | KeyCode::Char('q') => {
-                    return Ok(false);
+        for (id, config) in configs.iter().enumerate() {
+            if handles.contains_key(&id) {
+                if handles[&id].is_finished() {
+                    handles.remove(&id);
                 }
-                _ => {}
+            }
+
+            if !handles.contains_key(&id) {
+                let results = Arc::clone(&results);
+                let api_config = config.1.clone();
+                let handle = task::spawn(async move {
+                    let mut counter = api_config.interval;
+                    loop {
+                        thread::sleep(Duration::from_secs(1));
+                        counter -= 1;
+
+                        if counter < 1 {
+                            let status_api: app::ApiInformation = verify_api(&api_config).await;
+
+                            let mut results = results.lock().unwrap();
+                            let new_request = ListRequests {
+                                id: id.try_into().unwrap(),
+                                data: status_api,
+                                interval: api_config.interval,
+                            };
+                            if let Some(status) = results.iter_mut().find(|r| r.id == id) {
+                                *status = new_request;
+                            } else {
+                                results.push(new_request);
+                            }
+                            break;
+                        }
+
+                        let mut results = results.lock().unwrap();
+                        if let Some(status) = results.iter_mut().find(|r| r.id == id) {
+                            status.interval = counter;
+                        }
+                    }
+                });
+                handles.insert(id, handle);
+            }
+        }
+
+        let results = results.lock().unwrap();
+        app.append_satus2(results.clone());
+
+        if event::poll(std::time::Duration::from_millis(16))? {
+            if let event::Event::Key(key) = event::read()? {
+                if key.kind == event::KeyEventKind::Release {
+                    // Skip events that are not KeyEventKind::Press
+                    continue;
+                }
+                match key.code {
+                    KeyCode::Char('q') => {
+                        for handle in handles {
+                            handle.1.abort_handle();
+                        }
+                        return Ok(false);
+                    }
+                    _ => {}
+                }
             }
         }
     }
@@ -250,13 +246,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // create app and run it
     match config_object {
         Ok(configs) => {
-            // start_monitor(&configs.requests),
-            let mut app = App::new(&configs);
+            let mut app = App::new(configs.clone());
             app.format_api_infos();
-            let res = run_app(&mut terminal, &mut app);
-        
-        
-            // restore terminal
+
+            let _ = block_on(run_app(&mut terminal, &mut app, &configs.requests));
+
             disable_raw_mode()?;
             execute!(
                 terminal.backend_mut(),
@@ -264,8 +258,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 DisableMouseCapture
             )?;
             terminal.show_cursor()?;
-            // Ok(())
-    
         }
         Err(e) => println!("error parsing: {:?}", e),
     }

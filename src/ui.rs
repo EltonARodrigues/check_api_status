@@ -1,5 +1,5 @@
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     symbols::border,
     text::{Line, Text},
@@ -11,11 +11,6 @@ use ratatui::{
 };
 
 use crate::app::App;
-
-use tracing::{error, trace};
-use tracing_error::ErrorLayer;
-use tracing_subscriber::{self, layer::SubscriberExt, util::SubscriberInitExt, Layer};
-
 
 #[macro_export]
 macro_rules! trace_dbg {
@@ -38,15 +33,14 @@ macro_rules! trace_dbg {
     };
 }
 
-
 pub fn ui(f: &mut Frame, app: &App) {
     let title: Title<'static> = Title::from(" Health Crab TUI ".bold());
 
     let instructions = Title::from(Line::from(vec![
-        " Add API ".into(),
-        "<a>".blue().bold(),
-        " Delete API ".into(),
-        "<d>".blue().bold(),
+        // " Add API ".into(),
+        // "<a>".blue().bold(),
+        // " Delete API ".into(),
+        // "<d>".blue().bold(),
         " Quit ".into(),
         "<Q> ".blue().bold(),
     ]));
@@ -82,9 +76,9 @@ pub fn ui(f: &mut Frame, app: &App) {
     let content_center = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage((100 - 50) / 2),
-            Constraint::Percentage(50),
-            Constraint::Percentage((100 - 50) / 2),
+            Constraint::Percentage((100 - 90) / 2),
+            Constraint::Percentage(100),
+            Constraint::Percentage((100 - 90) / 2),
         ])
         .split(chunks[2])[1];
 
@@ -100,36 +94,28 @@ pub fn ui(f: &mut Frame, app: &App) {
 
     f.render_widget(header_info, chunks[1]);
 
-    // for api_info in app.apis_infos {
-    //     rows.push([
-    //         Cell::from(Text::from(String::from(api_info.get("name").unwrap())).alignment(Alignment::Center)),
-    //         Cell::from(Text::from(String::from(api_info.get("url").unwrap())).alignment(Alignment::Center)),
-    //         Cell::from(Text::from(String::from(api_info.get("url").unwrap())).alignment(Alignment::Center)),
-    //         Cell::from(Text::from(String::from(api_info.get("status").unwrap())).alignment(Alignment::Center))
-    //             .style(Style::default().fg(Color::Green)),
-    //     ]);
-    // }
-
     let mut rows: Vec<Row> = Vec::new();
 
+    // println!("aa: {:?}",app.apis_infos);
     for api_info in &app.apis_infos {
-        rows.push(Row::new(vec![
-            Cell::from(
-                Text::from(String::from(api_info.get("name").unwrap()))
-                    .alignment(Alignment::Center),
-            ),
-            Cell::from(
-                Text::from(String::from(api_info.get("method").unwrap())).alignment(Alignment::Center),
-            ),
-            Cell::from(
-                Text::from(String::from(api_info.get("url").unwrap())).alignment(Alignment::Center),
-            ),
-            Cell::from(
-                Text::from(String::from(api_info.get("status").unwrap()))
-                    .alignment(Alignment::Center),
-            )
-            .style(Style::default().fg(Color::Green)),
+        let data = &api_info.data;
 
+        let colour = match data.status.as_str() {
+            "OK" => Color::Green,
+            "ERROR" => Color::Red,
+            _ => Color::Yellow,
+        };
+
+        rows.push(Row::new(vec![
+            Cell::from(Text::from(String::from(&data.name)).alignment(Alignment::Center)),
+            Cell::from(Text::from(String::from(&data.method)).alignment(Alignment::Center)),
+            Cell::from(Text::from(String::from(&data.url)).alignment(Alignment::Center)),
+            Cell::from(Text::from(String::from(&data.status)).alignment(Alignment::Center))
+                .style(Style::default().fg(colour)),
+            Cell::from(
+                Text::from(String::from(&api_info.interval.to_string()))
+                    .alignment(Alignment::Center),
+            ),
         ]))
         // rows.push([
         // ]);
@@ -153,10 +139,11 @@ pub fn ui(f: &mut Frame, app: &App) {
     // ];
     // Columns widths are constrained in the same way as Layout...
     let widths = [
-        Constraint::Length(20),
-        Constraint::Length(20),
-        Constraint::Length(20),
+        Constraint::Length(30),
         Constraint::Length(10),
+        Constraint::Length(100),
+        Constraint::Length(20),
+        Constraint::Length(20),
     ];
     let table: Table<'static> = Table::new(rows, widths)
         .column_spacing(1)
@@ -166,35 +153,14 @@ pub fn ui(f: &mut Frame, app: &App) {
                 Cell::from(Text::from("Method").alignment(Alignment::Center)),
                 Cell::from(Text::from("Url").alignment(Alignment::Center)),
                 Cell::from(Text::from("Status").alignment(Alignment::Center)),
+                Cell::from(Text::from("Next Request").alignment(Alignment::Center)),
             ])
             .style(Style::new().bold())
             .bottom_margin(1),
         )
+        // .bg(Color::Red) // DEBUG SIZE
         .highlight_style(Style::new().reversed())
         .highlight_symbol(">>");
 
     f.render_widget(table, content_center);
-}
-
-/// helper function to create a centered rect using up certain percentage of the available rect `r`
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    // Cut the given rectangle into three vertical pieces
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
-        ])
-        .split(r);
-
-    // Then cut the middle vertical piece into three width-wise pieces
-    Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
-        ])
-        .split(popup_layout[1])[1] // Return the middle chunk
 }

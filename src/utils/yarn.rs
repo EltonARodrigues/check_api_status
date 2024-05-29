@@ -44,7 +44,7 @@ pub struct Api {
     pub depends_on: Option<Depends>,
     pub request: Request,
     pub expected_status: u16,
-    pub cron_expression: String,
+    pub interval: u64,
     pub system_notify: bool,
     pub notify_type: String,
     // pub one_time_notify: bool,
