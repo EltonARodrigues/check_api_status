@@ -1,10 +1,23 @@
-# Check api status 🦀
+# Health 🦀 TUI
 
-Testar requisições em API.
+TUI application to monitoring API status by interval of time. 
 
-## Arquivo de Configuração
+_*This repository is used for my rust practice*_
 
-Requisição simples: 
+![Application screenshot](docs/screenshot.png)
+
+## TODO
+
+  - [ ] Fix end of threads when close application
+  - [ ] Add more API information in UI
+  - [ ] Option to add/remove api wihtout file
+  - [ ] Update old deps
+
+# Usage
+
+Create a configuration file like this example:
+
+Simple Request: 
 ```yml
 requests:
   coffe_api:
@@ -13,21 +26,19 @@ requests:
       url: https://api.sampleapis.com/coffee/hot
       method: GET
     expected_status: 200
-    cron_expression: "0/10 * * * * *"
-    system_notify: false
-    notify_type: ANY
+    interval: 10 #  interval of requests in seconds
 ```
 
-Requisição dependente da resposta de outra API:
+If api depends of a previous request(ex: auth token) use `depends_on`:
 ```yml
 requests:
   api1:
     name: POST_MESSAGE
-    depends_on:
+    depends_on: 
       name: GET_TOKEN
       header_fields:
         - auth.token
-      body_fields:
+      body_fields: # mapped json fields
         - field1.field2
         - test1.test2
       request:
@@ -40,13 +51,22 @@ requests:
       url: http://127.0.0.1:5000/message/555555555
       method: POST
       headers:
-        authorization: "Bearer {{auth.token}}"
+        authorization: "Bearer {{auth.token}}" # using mapped key in depends_on response
         content-type: "application/json"
       body:
-        test: "test {{test1.test2}} test"
-        test2: "{{field1.field2}}"
+        test: "test {{test1.test2}} test" # using mapped key in depends_on response
+        test2: "{{field1.field2}}" # using mapped key in depends_on response
     expected_status: 201
-    cron_expression: "0/10 * * * * *"
-    system_notify: true
-    notify_type: ERROR
+    interval: 10 # interval of requests in seconds
 ```
+
+## Usage
+
+```
+git clone https://github.com/EltonARodrigues/check_api_status.git
+cd check_api_status
+cargo build
+# execute aplication using path of configuration file
+./target/debug/api_status -f template.yml
+```
+

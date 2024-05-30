@@ -79,6 +79,7 @@ pub async fn get_depends_result(
 
             let result: Value = match body {
                 Ok(r) => {
+                    println!("{:?}", r);
                     let body_json = serde_json::from_str(&r).unwrap();
                     body_json
                 }

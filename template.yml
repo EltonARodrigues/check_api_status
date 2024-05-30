@@ -1,6 +1,6 @@
 requests:
   api1:
-    name:
+    name: teste_api
     depends_on:
       name:
       header_fields:
@@ -10,7 +10,7 @@ requests:
         - xxxx.xxxxx.xxxxx
         - xx.xxx
       request:
-        url: http://127.0.0.1:5000/auth/token
+        url: http://127.0.0.1:8000/auth/token
         method: GET
         headers:
           sample1: XXXXXXXXX,
@@ -19,8 +19,9 @@ requests:
           sample1: XXXXXXXXX,
           sample2: XXXXXXXXX
     request:
-      url: http://127.0.0.1:5000/message/555555555
-      method: POST
+      # url: http://127.0.0.1:5000/message/555555555
+      url: http://localhost:5000/test.json
+      method: GET
       headers:
         sample1: "TEST {{xxxx.xxxxxxxx}}"
         sample2: "{{xxxxxxxxx.xx}}"
@@ -31,21 +32,33 @@ requests:
         sample2: "{{xx.xxx}}"
         sample3: "Sample Body"
     expected_status: 201
-    cron_expression: "0/10 * * * * *"
+    interval: 40
     system_notify: false
     notify_type: ALL|ERROR
   api2:
-    name:
+    name: api nova 123
     request:
-      url:
+      url: http://localhost:5000/test.json
       method: POST
       headers:
         sample1: "sample1"
         sample2: "sample2"
-      body:
+      # body:
+      #   sample1: "sample1"
+      #   sample2: "sample2"
+    expected_status: 200
+    interval: 15
+    system_notify: false
+    notify_type: ALL|ERROR
+  api3:
+    name: getUserinformation
+    request:
+      url: http://localhost:5000/test.json
+      method: GET
+      headers:
         sample1: "sample1"
         sample2: "sample2"
     expected_status: 200
-    cron_expression: "0/10 * * * * *"
+    interval: 10
     system_notify: false
     notify_type: ALL|ERROR

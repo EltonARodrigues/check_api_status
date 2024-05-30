@@ -13,6 +13,15 @@ pub enum ConfigMethod {
     // PATH,
 }
 
+impl ToString for ConfigMethod {
+    fn to_string(&self) -> String {
+        match self {
+            ConfigMethod::GET => String::from("GET"),
+            ConfigMethod::POST => String::from("POST"),
+        }
+    }
+}
+
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct Request {
     pub url: String,
@@ -35,7 +44,7 @@ pub struct Api {
     pub depends_on: Option<Depends>,
     pub request: Request,
     pub expected_status: u16,
-    pub cron_expression: String,
+    pub interval: u64,
     pub system_notify: bool,
     pub notify_type: String,
     // pub one_time_notify: bool,
