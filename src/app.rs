@@ -35,7 +35,7 @@ impl App {
         }
     }
 
-    pub fn append_satus2(&mut self, result: Vec<ListRequests>) {
+    pub fn append_status(&mut self, result: Vec<ListRequests>) {
         self.apis_infos = result
     }
 

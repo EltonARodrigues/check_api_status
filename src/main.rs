@@ -4,6 +4,7 @@ mod utils;
 use app::{ApiInformation, ListRequests};
 use request::{get_depends_result, request_api};
 
+use utils::notify::send_notify;
 use utils::yarn::{Api, ApisConfig, ReqHash};
 
 use clap::Arg;
@@ -103,9 +104,7 @@ async fn verify_api(api: &Api) -> ApiInformation {
 
     let status = match response {
         Ok(resp) => resp.status().as_u16(),
-        Err(_) => {
-            500 // TODO
-        }
+        Err(_) => 500
     };
 
     let mut request_data = ApiInformation {
@@ -121,6 +120,10 @@ async fn verify_api(api: &Api) -> ApiInformation {
         }
     } else {
         request_data.status = "ERROR".to_string();
+        if api.system_notify == true {
+            let notify_message = format!("Request failed with status {status}");
+            send_notify(api.name.as_str(), "dialog-error", notify_message.as_str()).unwrap();
+        }
     }
 
     request_data
@@ -193,7 +196,7 @@ async fn run_app<B: Backend>(
         }
 
         let results = results.lock().unwrap();
-        app.append_satus2(results.clone());
+        app.append_status(results.clone());
 
         if event::poll(std::time::Duration::from_millis(16))? {
             if let event::Event::Key(key) = event::read()? {
@@ -236,14 +239,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let config_object = load_config(config_path);
 
-    // setup terminal
     enable_raw_mode()?;
-    let mut stderr: io::Stderr = io::stderr(); // This is a special case. Normally using stdout is fine
-    execute!(stderr, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stderr);
+    let mut stdout: io::Stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // create app and run it
     match config_object {
         Ok(configs) => {
             let mut app = App::new(configs.clone());

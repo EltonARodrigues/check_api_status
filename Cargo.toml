@@ -1,6 +1,6 @@
 [package]
-name = "api_status"
-version = "0.1.0"
+name = "health-crab-tui"
+version = "0.2.0"
 authors = ["Elton de Andrade Rodrigues <eltonrodrigues61@gmail.com>"]
 edition = "2018"
 

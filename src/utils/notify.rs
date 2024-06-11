@@ -6,7 +6,7 @@ pub fn send_notify(
     message: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     Notification::new()
-        .summary(name)
+        .summary(format!("API: {}", name).as_str())
         .body(message)
         .icon(icon_type)
         .show()?;

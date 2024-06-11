@@ -96,7 +96,6 @@ pub fn ui(f: &mut Frame, app: &App) {
 
     let mut rows: Vec<Row> = Vec::new();
 
-    // println!("aa: {:?}",app.apis_infos);
     for api_info in &app.apis_infos {
         let data = &api_info.data;
 
@@ -117,27 +116,8 @@ pub fn ui(f: &mut Frame, app: &App) {
                     .alignment(Alignment::Center),
             ),
         ]))
-        // rows.push([
-        // ]);
     }
 
-    // let rows = [
-    //     Row::new(vec![
-    //         Cell::from(Text::from("Buscar usuários").alignment(Alignment::Center)),
-    //         Cell::from(Text::from("GET").alignment(Alignment::Center)),
-    //         Cell::from(Text::from("http://test.com.test").alignment(Alignment::Center)),
-    //         Cell::from(Text::from("OK").alignment(Alignment::Center))
-    //             .style(Style::default().fg(Color::Green)),
-    //     ]),
-    //     Row::new(vec![
-    //         Cell::from(Text::from("Buscar lances").alignment(Alignment::Center)),
-    //         Cell::from(Text::from("POST").alignment(Alignment::Center)),
-    //         Cell::from(Text::from("http://test.com.test22").alignment(Alignment::Center)),
-    //         Cell::from(Text::from("FAILED").alignment(Alignment::Center))
-    //             .style(Style::default().fg(Color::Red)),
-    //     ]),
-    // ];
-    // Columns widths are constrained in the same way as Layout...
     let widths = [
         Constraint::Length(30),
         Constraint::Length(10),
