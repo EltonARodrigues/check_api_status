@@ -46,7 +46,6 @@ async fn verify_api(api: &Api) -> ApiInformation {
         None => HashMap::new(),
     };
 
-    // println!("aaa{:?}", fields_required["depends_headers"]);
     for header in &api.request.headers {
         for (key, value) in header {
             if fields_required.len() > 0 {
@@ -105,7 +104,7 @@ async fn verify_api(api: &Api) -> ApiInformation {
 
     let status = match response {
         Ok(resp) => resp.status().as_u16(),
-        Err(_) => 500
+        Err(_) => 500,
     };
 
     let mut request_data = ApiInformation {
@@ -130,13 +129,13 @@ async fn verify_api(api: &Api) -> ApiInformation {
     request_data
 }
 
-fn load_config(config_path: &str) -> Result<ApisConfig, serde_yaml::Error> {
+fn load_config(config_path: &str) -> Result<ApisConfig, serde_yml::Error> {
     println!("Searching for {}", config_path);
 
     let config_str_content =
         fs::read_to_string(config_path).expect("Something went wrong reading the file");
 
-    let deserialized = serde_yaml::from_str::<ApisConfig>(&config_str_content);
+    let deserialized = serde_yml::from_str::<ApisConfig>(&config_str_content);
 
     deserialized
 }
@@ -222,7 +221,7 @@ async fn run_app<B: Backend>(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let matches = Command::new("My Test Program")
+    let cmd_matches = Command::new("Health Crab TUI")
         .version("0.1.0")
         .author("Elton de Andrade Rodrigues <xxxxxxxxxxxx@xx>")
         .about("Verify API status")
@@ -230,13 +229,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Arg::new("file")
                 .short('f')
                 .long("file")
-                .takes_value(true)
                 .help("config file with APIs"),
         )
         .get_matches();
 
-    let config_path = matches
-        .value_of("file")
+    let config_path = cmd_matches
+        .get_one::<String>("file")
         .unwrap_or_else(|| panic!("File not set"));
 
     let config_object = load_config(config_path);
@@ -252,7 +250,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let mut app = App::new(configs.clone());
             app.format_api_infos();
 
-            let _ = block_on(run_app(&mut terminal, &mut app, &configs.requests));
+            let _ = run_app(&mut terminal, &mut app, &configs.requests).await;
 
             disable_raw_mode()?;
             execute!(

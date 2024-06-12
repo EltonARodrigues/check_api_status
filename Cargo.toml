@@ -2,25 +2,24 @@
 name = "health-crab-tui"
 version = "0.2.0"
 authors = ["Elton de Andrade Rodrigues <eltonrodrigues61@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 crossterm = "0.27.0"
 futures = "0.3"
-ratatui = "0.26.1"
+ratatui = "0.26"
 reqwest = { version = "0.12.4", features = ["blocking", "json"] }
 tokio = { version = "1", features = ["full"] }
 notify-rust = "4"
-serde_json = "1.0"
-serde_derive = "1.0" 
-serde = "1.0"
+serde_json = "1"
+serde_derive = "1"
+serde = "1"
 dotenv = "0.15.0"
-clap = "3.1.8"
-# job_scheduler = "*"
+clap = "4.5.7"
 yaml-rust = "0.4"
-serde_yaml = "0.8.23"
+serde_yml = "0.0.10"
 tracing-error = "0.2.0"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
