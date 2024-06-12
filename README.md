@@ -8,9 +8,9 @@ _*This repository is used for my rust practice*_
 
 ## TODO
 
-  - [ ] Fix end of threads when close application
+  - [x] Fix end of threads when close application
   - [ ] Add more API information in UI
-  - [ ] Option to add/remove api wihtout file
+  - [ ] Option to add/remove api without file
   - [ ] Update old deps
 
 # Usage

@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fs;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -148,6 +149,7 @@ async fn run_app<B: Backend>(
     let mut handles: HashMap<usize, task::JoinHandle<()>> = HashMap::new();
 
     let results = Arc::new(Mutex::new(app.apis_infos.clone()));
+    let running = Arc::new(AtomicBool::new(true));
 
     loop {
         terminal.draw(|f| ui(f, app))?;
@@ -162,9 +164,11 @@ async fn run_app<B: Backend>(
             if !handles.contains_key(&id) {
                 let results = Arc::clone(&results);
                 let api_config = config.1.clone();
+                let running = running.clone();
+
                 let handle = task::spawn(async move {
                     let mut counter = api_config.interval;
-                    loop {
+                    while running.load(Ordering::SeqCst) {
                         thread::sleep(Duration::from_secs(1));
                         counter -= 1;
 
@@ -206,10 +210,8 @@ async fn run_app<B: Backend>(
                 }
                 match key.code {
                     KeyCode::Char('q') => {
-                        for handle in handles {
-                            handle.1.abort_handle();
-                        }
-                        return Ok(false);
+                        running.store(false, Ordering::SeqCst);
+                        return Ok(true);
                     }
                     _ => {}
                 }
