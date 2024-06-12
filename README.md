@@ -9,9 +9,10 @@ _*This repository is used for my rust practice*_
 ## TODO
 
   - [x] Fix end of threads when close application
+  - [x] restore notification feature 
   - [ ] Add more API information in UI
   - [ ] Option to add/remove api without file
-  - [ ] Update old deps
+  - [x] Update old deps
 
 # Usage
 
@@ -67,6 +68,6 @@ git clone https://github.com/EltonARodrigues/check_api_status.git
 cd check_api_status
 cargo build
 # execute aplication using path of configuration file
-./target/debug/api_status -f template.yml
+./target/debug/health-crab-tui -f template.yml
 ```
 
